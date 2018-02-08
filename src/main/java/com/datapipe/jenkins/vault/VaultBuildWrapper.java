@@ -85,15 +85,12 @@ public class VaultBuildWrapper extends SimpleBuildWrapper {
         PrintStream logger = listener.getLogger();
         pullAndMergeConfiguration(build);
 
-        // JENKINS-44163 - Build fails with a NullPointerException when no secrets are given for a job
-        if (null != vaultSecrets && !vaultSecrets.isEmpty()) {
             try {
                 provideEnvironmentVariablesFromVault(context, build);
             } catch (VaultException e) {
                 e.printStackTrace(logger);
                 throw new AbortException(e.getMessage());
             }
-        }
     }
 
 
@@ -126,15 +123,24 @@ public class VaultBuildWrapper extends SimpleBuildWrapper {
         VaultCredential credential = retrieveVaultCredentials(build);
 
         vaultAccessor.init(url);
-        for (VaultSecret vaultSecret : vaultSecrets) {
-            vaultAccessor.auth(credential);
-            Map<String, String> values = vaultAccessor.read(vaultSecret.getPath());
 
-            for (VaultSecretValue value : vaultSecret.getSecretValues()) {
-                valuesToMask.add(values.get(value.getVaultKey()));
-                context.env(value.getEnvVar(), values.get(value.getVaultKey()));
+        // JENKINS-44163 - Build fails with a NullPointerException when no secrets are given for a job
+        if (null != vaultSecrets && !vaultSecrets.isEmpty()) {
+            for (VaultSecret vaultSecret : vaultSecrets) {
+                vaultAccessor.auth(credential);
+                Map<String, String> values = vaultAccessor.read(vaultSecret.getPath());
+
+                for (VaultSecretValue value : vaultSecret.getSecretValues()) {
+                    valuesToMask.add(values.get(value.getVaultKey()));
+                    context.env(value.getEnvVar(), values.get(value.getVaultKey()));
+                }
             }
+        } else {
+            vaultAccessor.auth(credential);
         }
+
+        valuesToMask.add("VAULT_TOKEN");
+        context.env("VAULT_TOKEN", vaultAccessor.getToken());
     }
 
     private VaultCredential retrieveVaultCredentials(Run build) {
