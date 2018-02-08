@@ -13,10 +13,13 @@ public class VaultAccessor {
 
     private VaultConfig config;
 
+    private String token = "";
+
     public void init(String url) {
         try {
             config = new VaultConfig(url).build();
             vault = new Vault(config);
+            token = config.getToken();
         } catch (VaultException e) {
             throw new VaultPluginException("failed to connect to vault", e);
         }
@@ -24,6 +27,7 @@ public class VaultAccessor {
 
     public void auth(VaultCredential vaultCredential) {
         vault = vaultCredential.authorizeWithVault(vault, config);
+        token = config.getToken();
     }
 
     public Map<String, String> read(String path) {
@@ -32,5 +36,9 @@ public class VaultAccessor {
         } catch (VaultException e) {
             throw new VaultPluginException("could not read from vault: " + e.getMessage() + " at path: " + path, e);
         }
+    }
+
+    public String getToken(){
+        return this.token;
     }
 }
